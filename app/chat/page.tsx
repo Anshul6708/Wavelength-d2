@@ -1,297 +1,260 @@
 "use client"
 
-import { useChat } from "ai/react"
-import { useAuth } from "@/components/auth-provider"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Card } from "@/components/ui/card"
-import { Send, Sparkles, Plus, MessageSquare } from "lucide-react"
-import { useEffect, useRef, useState, useCallback } from "react"
-import { useRouter } from "next/navigation"
-import { ChatHeader } from "@/components/chat-header"
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion"
+import { useState, useRef, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import Image from 'next/image';
+import { ArrowUpIcon, PaperAirplaneIcon } from '@heroicons/react/24/solid';
+import { useToast } from "@/hooks/use-toast"
 
-interface Message {
-  id: string
-  role: "user" | "assistant"
-  content: string
-  timestamp: Date
-}
+type Message = {
+  role: 'user' | 'assistant';
+  content: string;
+};
+
+const TIMEOUT_MS = 15000; // 15 seconds
+const MAX_RETRIES = 2;
+
+const INITIAL_MESSAGE: Message = {
+  role: 'assistant',
+  content: "Hey, I'm Wavelength—your conversational matchmaker. I'm here to understand who you really are through a natural conversation. Let's start with something simple: How's your day been going?"
+};
 
 export default function ChatPage() {
-  const { user, updateUser } = useAuth()
-  const router = useRouter()
-  const messagesEndRef = useRef<HTMLDivElement>(null)
-  const chatContainerRef = useRef<HTMLDivElement>(null)
-  const [selectedChat, setSelectedChat] = useState<number>(0)
-  const [currentMessages, setCurrentMessages] = useState<Message[]>([])
-  const [isSaving, setIsSaving] = useState(false)
-  const [shouldAutoScroll, setShouldAutoScroll] = useState(true)
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [input, setInput] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const router = useRouter();
+  const { toast } = useToast();
 
-  // Initialize chat history if needed
+  // Load messages from localStorage on component mount
   useEffect(() => {
-    if (!user) {
-      router.push("/")
-      return
+    const savedMessages = localStorage.getItem('chatMessages');
+    if (savedMessages) {
+      setMessages(JSON.parse(savedMessages));
+    } else {
+      setMessages([INITIAL_MESSAGE]);
     }
-
-    if (!Array.isArray(user.chatHistory) || user.chatHistory.length === 0) {
-      updateUser({ chatHistory: [[]] })
-    }
-  }, [user, router, updateUser])
-
-  // Load selected chat messages whenever the selected chat changes
-  useEffect(() => {
-    if (!user?.chatHistory?.[selectedChat]) return
-    
-    const chatMessages = user.chatHistory[selectedChat].map(msg => ({
-      id: Math.random().toString(),
-      role: msg.role,
-      content: msg.content,
-      timestamp: new Date(msg.timestamp)
-    }))
-    setCurrentMessages(chatMessages)
-  }, [selectedChat, user?.chatHistory])
+  }, []);
 
   // Save messages to localStorage whenever they change
-  const saveMessagesRef = useRef(false)
-  
   useEffect(() => {
-    if (!user || isSaving || !saveMessagesRef.current) {
-      saveMessagesRef.current = true
-      return
+    if (messages.length > 0) {
+      localStorage.setItem('chatMessages', JSON.stringify(messages));
     }
+  }, [messages]);
 
-    const saveMessages = async () => {
-      try {
-        setIsSaving(true)
-        const newChatHistory = [...user.chatHistory]
-        newChatHistory[selectedChat] = currentMessages.map(msg => ({
-          role: msg.role,
-          content: msg.content,
-          timestamp: msg.timestamp
-        }))
-        await updateUser({ chatHistory: newChatHistory })
-      } catch (error) {
-        console.error('Error saving messages:', error)
-      } finally {
-        setIsSaving(false)
-      }
+  // Auto-scroll to bottom when messages change
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  // Dynamic textarea height
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    if (textarea) {
+      textarea.style.height = 'auto';
+      textarea.style.height = Math.min(textarea.scrollHeight, 200) + 'px';
     }
+  }, [input]);
 
-    const timeoutId = setTimeout(saveMessages, 1000)
-    return () => clearTimeout(timeoutId)
-  }, [currentMessages, user, selectedChat, updateUser, isSaving])
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!input.trim() || isLoading) return;
 
-  const { input, handleInputChange, handleSubmit, isLoading } = useChat({
-    api: "/api/chat",
-    id: selectedChat.toString(),
-    initialMessages: currentMessages,
-    onFinish: async (message: { content: string }) => {
-      const newAssistantMessage = {
-        id: Math.random().toString(),
-        role: "assistant" as const,
-        content: message.content,
-        timestamp: new Date()
-      }
-      setCurrentMessages(prev => [...prev, newAssistantMessage])
-    },
-  })
-
-  const handleFormSubmit = useCallback(async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!input.trim() || !user) return
-
-    const newUserMessage = {
-      id: Math.random().toString(),
-      role: "user" as const,
-      content: input,
-      timestamp: new Date()
-    }
-
-    // Update messages immediately
-    setCurrentMessages(prev => [...prev, newUserMessage])
-
-    // Submit to API
-    await handleSubmit(e)
-  }, [input, user, handleSubmit])
-
-  const startNewChat = useCallback(() => {
-    if (!user) return
-    
-    const newChatHistory = [...user.chatHistory, []]
-    updateUser({ chatHistory: newChatHistory })
-    setSelectedChat(newChatHistory.length - 1)
-    setCurrentMessages([])
-  }, [user, updateUser])
-
-  const generateProfileSummary = async () => {
-    if (!user) return
+    const userMessage: Message = { role: 'user', content: input };
+    setMessages(prev => [...prev, userMessage]);
+    setInput('');
+    setIsLoading(true);
+    setError(null);
 
     try {
-      const response = await fetch("/api/generate-summary", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ chatHistory: user.chatHistory.flat() }),
-      })
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          messages: [...messages, userMessage],
+        }),
+      });
 
-      const { summary } = await response.json()
-      updateUser({ profileSummary: summary })
-    } catch (error) {
-      console.error("Failed to generate summary:", error)
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to get response');
+      }
+
+      const data = await response.json();
+      console.log('API Response:', data);
+      setMessages(prev => [...prev, { role: data.role, content: data.content }]);
+
+      // Check if this is the last message that generates the summary
+      if (data.generatesSummary) {
+        console.log('Summary generation detected');
+        // Make sure we have a summary before proceeding
+        if (!data.summary) {
+          console.error('Summary was expected but not received');
+          return;
+        }
+        console.log('Saving summary:', data.summary);
+
+        toast({
+          title: "Summary Generated!",
+          description: "Your wavelength summary is now available.",
+          duration: 5000,
+        });
+        
+        // Store the summary in localStorage
+        localStorage.setItem('wavelengthSummary', data.summary);
+        localStorage.setItem('hasSummary', 'true');
+
+        // Force a reload when navigating to ensure fresh state
+        setTimeout(() => {
+          console.log('Navigating to profile page...');
+          window.location.href = '/profile?tab=Your%20Wavelength';
+        }, 1500);
+      }
+    } catch (error: any) {
+      console.error('Error:', error);
+      setError(error.message || 'Something went wrong. Please try again.');
+      setMessages(prev => prev.slice(0, -1));
+    } finally {
+      setIsLoading(false);
     }
-  }
+  };
 
-  // Add scroll handler to detect when user manually scrolls
-  useEffect(() => {
-    const chatContainer = chatContainerRef.current
-    if (!chatContainer) return
-
-    const handleScroll = () => {
-      const { scrollTop, scrollHeight, clientHeight } = chatContainer
-      const isAtBottom = scrollHeight - scrollTop - clientHeight < 100
-      setShouldAutoScroll(isAtBottom)
-    }
-
-    chatContainer.addEventListener('scroll', handleScroll)
-    return () => chatContainer.removeEventListener('scroll', handleScroll)
-  }, [])
-
-  // Smart scroll effect that respects user scrolling
-  useEffect(() => {
-    if (shouldAutoScroll && messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: "smooth" })
-    }
-  }, [currentMessages, shouldAutoScroll])
-
-  if (!user) return null
+  // Add a function to clear chat history
+  const clearChat = () => {
+    localStorage.removeItem('chatMessages');
+    localStorage.removeItem('wavelengthSummary');
+    localStorage.removeItem('hasSummary');
+    setMessages([INITIAL_MESSAGE]);
+  };
 
   return (
-    <div className="flex h-screen">
-      {/* Sidebar */}
-      <div className="w-64 bg-gray-900 border-r border-gray-800 p-4 flex flex-col">
-        <Button
-          onClick={startNewChat}
-          className="mb-4 bg-purple-600 hover:bg-purple-700 w-full"
+    <div className="flex h-screen bg-[#0C0C0C]">
+      {/* New Chat Button */}
+      <div className="w-16 border-r border-gray-800 flex flex-col items-center pt-4">
+        <button
+          onClick={clearChat}
+          className="p-3 hover:bg-gray-800 rounded-lg transition-colors group"
+          title="New Chat"
         >
-          <Plus className="h-4 w-4 mr-2" /> New Chat
-        </Button>
-        
-        <div className="flex-1 overflow-y-auto">
-          <Accordion type="single" collapsible className="space-y-2">
-            {user.chatHistory?.map((chat, index) => {
-              const firstMessage = chat[0]?.content || "New Chat"
-              const preview = firstMessage.length > 30 
-                ? firstMessage.substring(0, 30) + "..."
-                : firstMessage
-              
-              return (
-                <AccordionItem 
-                  key={index} 
-                  value={`chat-${index}`}
-                  className="border border-gray-800 rounded-lg overflow-hidden"
-                >
-                  <AccordionTrigger 
-                    className={`px-3 py-2 text-sm ${
-                      selectedChat === index ? "bg-purple-900/30" : "hover:bg-gray-800"
-                    }`}
-                    onClick={(e) => {
-                      e.preventDefault()
-                      setSelectedChat(index)
-                    }}
-                  >
-                    <div className="flex items-center">
-                      <MessageSquare className="h-4 w-4 mr-2" />
-                      <span className="text-left">{preview}</span>
-                    </div>
-                  </AccordionTrigger>
-                  <AccordionContent className="bg-gray-800/50 px-3 py-2">
-                    <div className="text-xs text-gray-400">
-                      {chat.length} messages
-                      <br />
-                      {chat[chat.length - 1]?.timestamp 
-                        ? new Date(chat[chat.length - 1].timestamp).toLocaleDateString()
-                        : "No messages"}
-                    </div>
-                  </AccordionContent>
-                </AccordionItem>
-              )
-            })}
-          </Accordion>
-        </div>
+          <svg 
+            xmlns="http://www.w3.org/2000/svg" 
+            viewBox="0 0 24 24" 
+            fill="currentColor" 
+            className="w-6 h-6 text-gray-400 group-hover:text-white"
+          >
+            <path d="M21.731 2.269a2.625 2.625 0 00-3.712 0l-1.157 1.157 3.712 3.712 1.157-1.157a2.625 2.625 0 000-3.712zM19.513 8.199l-3.712-3.712-12.15 12.15a5.25 5.25 0 00-1.32 2.214l-.8 2.685a.75.75 0 00.933.933l2.685-.8a5.25 5.25 0 002.214-1.32L19.513 8.2z" />
+          </svg>
+        </button>
       </div>
-
+      
       {/* Main Chat Area */}
       <div className="flex-1 flex flex-col">
-        <ChatHeader />
-        <div 
-          ref={chatContainerRef}
-          className="flex-1 overflow-y-auto space-y-4 p-4"
-        >
-          {currentMessages.length === 0 && (
-            <Card className="bg-gray-900 border-gray-800 p-6 text-center">
-              <Sparkles className="h-12 w-12 text-purple-500 mx-auto mb-4" />
-              <h2 className="text-xl font-semibold text-white mb-2">Welcome to your Wavelength chat</h2>
-              <p className="text-gray-400">
-                Start a conversation to discover your unique wavelength. I'll help you explore your thoughts, interests,
-                and personality.
-              </p>
-            </Card>
-          )}
+        {/* Header */}
+        <header className="border-b border-gray-800 p-4 flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <button 
+              onClick={() => router.push('/')}
+              className="text-gray-400 hover:text-white transition-colors"
+            >
+              <ArrowUpIcon className="h-5 w-5 transform rotate-[-90deg]" />
+            </button>
+            <h1 className="text-xl font-semibold text-white">Wavelength</h1>
+          </div>
+        </header>
 
-          {currentMessages.map((message) => (
-            <div key={message.id} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
+        {/* Chat messages */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-6">
+          {messages.map((message, i) => (
+            <div
+              key={i}
+              className={`flex items-start space-x-4 ${
+                message.role === 'user' ? 'justify-end' : 'justify-start'
+              }`}
+            >
+              {message.role === 'assistant' && (
+                <div className="w-8 h-8 rounded-full bg-purple-600 flex items-center justify-center flex-shrink-0">
+                  <span className="text-white text-sm">W</span>
+                </div>
+              )}
               <div
-                className={`max-w-xs lg:max-w-md px-4 py-2 rounded-2xl ${
-                  message.role === "user" ? "bg-purple-600 text-white" : "bg-gray-800 text-white"
+                className={`relative max-w-[80%] rounded-2xl px-4 py-3 ${
+                  message.role === 'user'
+                    ? 'bg-purple-600 text-white'
+                    : 'bg-gray-800 text-white'
                 }`}
               >
                 {message.content}
               </div>
+              {message.role === 'user' && (
+                <div className="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center flex-shrink-0">
+                  <span className="text-white text-sm">U</span>
+                </div>
+              )}
             </div>
           ))}
-
           {isLoading && (
-            <div className="flex justify-start">
-              <div className="bg-gray-800 text-white px-4 py-2 rounded-2xl">
-                <div className="flex space-x-1">
-                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                  <div
-                    className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
-                    style={{ animationDelay: "0.1s" }}
-                  ></div>
-                  <div
-                    className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
-                    style={{ animationDelay: "0.2s" }}
-                  ></div>
+            <div className="flex items-start space-x-4">
+              <div className="w-8 h-8 rounded-full bg-purple-600 flex items-center justify-center flex-shrink-0">
+                <span className="text-white text-sm">W</span>
+              </div>
+              <div className="bg-gray-800 text-white px-4 py-3 rounded-2xl">
+                <div className="flex space-x-2">
+                  <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce"></div>
+                  <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                  <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
                 </div>
               </div>
             </div>
           )}
-
+          {error && (
+            <div className="flex justify-center">
+              <div className="bg-red-500/10 border border-red-500 text-red-500 px-4 py-2 rounded-lg">
+                {error}
+              </div>
+            </div>
+          )}
           <div ref={messagesEndRef} />
         </div>
 
-        <form onSubmit={handleFormSubmit} className="p-4 border-t border-gray-800">
-          <div className="flex space-x-2">
-            <Input
-              value={input}
-              onChange={handleInputChange}
-              placeholder="Share your thoughts..."
-              className="flex-1 bg-gray-800 border-gray-700 text-white"
-              disabled={isLoading}
-            />
-            <Button type="submit" disabled={isLoading || !input.trim()} className="bg-purple-600 hover:bg-purple-700">
-              <Send className="h-4 w-4" />
-            </Button>
-          </div>
-        </form>
+        {/* Input form */}
+        <div className="border-t border-gray-800 p-4">
+          <form onSubmit={handleSubmit} className="max-w-4xl mx-auto">
+            <div className="relative">
+              <textarea
+                ref={textareaRef}
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSubmit(e);
+                  }
+                }}
+                placeholder="Share your thoughts..."
+                className="w-full bg-gray-800 text-white rounded-xl pl-4 pr-12 py-3 focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
+                rows={1}
+                disabled={isLoading}
+              />
+              <button
+                type="submit"
+                disabled={isLoading || !input.trim()}
+                className="absolute right-2 bottom-2.5 text-white p-1.5 rounded-lg 
+                         disabled:opacity-50 disabled:cursor-not-allowed
+                         enabled:bg-purple-600 enabled:hover:bg-purple-700 transition-colors"
+              >
+                <PaperAirplaneIcon className="h-5 w-5" />
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
     </div>
-  )
+  );
 }

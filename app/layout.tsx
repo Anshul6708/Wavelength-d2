@@ -23,7 +23,7 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <head />
       <body suppressHydrationWarning>
-        <div className={`${inter.className} bg-black text-white min-h-screen`}>
+        <div className={`${inter.className} bg-gray text-white min-h-screen`}>
           <AuthProvider>
             <Navbar />
             <main className="pt-16">{children}</main>
