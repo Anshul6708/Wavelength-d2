@@ -91,7 +91,7 @@ Recommend a thoughtful song based on the user’s current emotional vibe or refl
 5. Avoid broad “describe yourself” style questions.
 6. Don’t dwell too long on any single theme unless the user opens up deeply.`;
 
-const SUMMARY_PROMPT = `Wrapping Up (Essential)
+const SUMMARY_PROMPT = `Here's a quick summary of what I have gathered from our conversation so far
 After exploring these areas naturally, provide:
 1. Personality Summary
 Reflect back what you've learned about how they think, what they value, how they approach relationships and life decisions.
