@@ -91,7 +91,7 @@ Recommend a thoughtful song based on the user’s current emotional vibe or refl
 5. Avoid broad “describe yourself” style questions.
 6. Don’t dwell too long on any single theme unless the user opens up deeply.`;
 
-const SUMMARY_PROMPT = `Here's a quick summary of what I have gathered from our conversation so far
+const SUMMARY_PROMPT = `
 After exploring these areas naturally, provide:
 1. Personality Summary
 Reflect back what you've learned about how they think, what they value, how they approach relationships and life decisions.
@@ -104,7 +104,8 @@ Give them concrete things to look for or questions to ask when meeting someone n
 5. Song Recommendation
 End with a thoughtful song suggestion that matches their current mood or energy—a small, personal touch to close the conversation warmly.
 6. Invitation to Continue
-Acknowledge that 10 questions only scratch the surface. Warmly invite them to continue chatting if they want a deeper exploration.`;
+Acknowledge that 10 questions only scratch the surface. Warmly invite them to continue chatting if they want a deeper exploration.
+Please start your response with "Here's a quick summary of what I have gathered from our conversation so far"`;
 
 export async function POST(req: Request) {
   try {
