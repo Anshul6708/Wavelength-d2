@@ -16,7 +16,7 @@ const MAX_RETRIES = 2;
 
 const INITIAL_MESSAGE: Message = {
   role: 'assistant',
-  content: "I'm Wavelength—your conversational matchmaker. I'm here to understand who you really are through a natural conversation. Let's start with something simple: How's your day been going?"
+  content: "Hey, I’m Wavelength—your conversational matchmaker. I’m here to explore your personality and values through a light, story-like dialogue across 10 questions. The idea is to understand how you think and what drives your choices—not just what you like or dislike. Why? Because compatibility goes beyond hobbies or favorite foods—it's about how people view the world, solve problems, handle relationships, and navigate life. If at any point a question feels too personal or tricky, feel free to say 'I don't know' or 'let's skip this'—totally okay. Shall we begin?"
 };
 
 export default function ChatPage() {
