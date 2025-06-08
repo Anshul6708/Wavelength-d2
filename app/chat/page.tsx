@@ -16,7 +16,7 @@ const MAX_RETRIES = 2;
 
 const INITIAL_MESSAGE: Message = {
   role: 'assistant',
-  content: "Hey, I'm Wavelength—your conversational matchmaker. I'm here to understand who you really are through a natural conversation. Let's start with something simple: How's your day been going?"
+  content: "I'm Wavelength—your conversational matchmaker. I'm here to understand who you really are through a natural conversation. Let's start with something simple: How's your day been going?"
 };
 
 export default function ChatPage() {
