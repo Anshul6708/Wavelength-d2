@@ -133,7 +133,7 @@ export default function ProfilePage() {
                       <p className="text-gray-300 leading-relaxed">{summary}</p>
                     </div>
                     <div className="border-t border-gray-800 pt-4 mt-6">
-                      <p className="text-gray-300 mb-3">Share your wavelength with others</p>
+                      <p className="text-gray-300 mb-3">Check your wavelength with others</p>
                       <div className="flex space-x-2">
                         <input
                           type="text"
