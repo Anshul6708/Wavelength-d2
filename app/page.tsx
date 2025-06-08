@@ -7,7 +7,7 @@ export default function Home() {
   const router = useRouter();
 
   return (
-    <main className="flex min-h-screen flex-col items-center bg-[#1C1C1C] text-white p-4">
+    <main className="flex min-h-screen flex-col items-center bg-black text-white p-4">
       <div className="flex flex-col items-center mt-[10vh]">
         <h1 className="text-5xl font-light mb-12">Wavelength</h1>
         <p className="text-3xl text-gray-400 italic mb-12">Only meet people of your wavelength</p>
