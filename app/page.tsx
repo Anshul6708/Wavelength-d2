@@ -20,7 +20,7 @@ export default function Home() {
 
         <div className="relative w-[300px] h-[200px]">
           <Image
-            src="/wavelength-hero.png"
+            src="/wavelength-hero.svg"
             alt="Wavelength illustration"
             fill
             style={{ objectFit: 'contain' }}
