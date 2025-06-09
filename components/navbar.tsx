@@ -16,7 +16,7 @@ export function Navbar() {
         <div className="flex justify-between items-center bg-[#1C1C1C] h-16">
           <Link href="/" className="flex items-center">
             <Image 
-              src="/wavelength-hero.png"
+              src="/wavelength-hero.svg"
               alt="Wavelength Logo"
               width={180}
               height={80}
